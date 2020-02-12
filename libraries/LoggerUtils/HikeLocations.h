@@ -1,0 +1,120 @@
+/*
+*	HikeLocations.h, Copyright Jonathan Mackey 2019
+*	Class to manage hike locations.
+*
+*	The requirement I have is that it not be tied to any specific storage AND
+*	when adding/removing locations, the existing locations will not move.  This
+*	is implemented using a generic stream, which means it can be stored anywhere.
+*	It's also a simple linked list, so minimal changes are needed to add and
+*	remove locations.
+*
+*	GNU license:
+*	This program is free software: you can redistribute it and/or modify
+*	it under the terms of the GNU General Public License as published by
+*	the Free Software Foundation, either version 3 of the License, or
+*	(at your option) any later version.
+*
+*	This program is distributed in the hope that it will be useful,
+*	but WITHOUT ANY WARRANTY; without even the implied warranty of
+*	MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+*	GNU General Public License for more details.
+*
+*	You should have received a copy of the GNU General Public License
+*	along with this program.  If not, see <http://www.gnu.org/licenses/>.
+*
+*	Please maintain this license information along with authorship and copyright
+*	notices in any redistribution of this code.
+*
+*/
+#ifndef HikeLocations_h
+#define HikeLocations_h
+
+#include <inttypes.h>
+
+class DataStream;
+
+typedef struct
+{
+	uint16_t	elevation;	// Location elevation in feet.
+	char		name[20];	// Location name
+} SHikeLocation;
+
+/*
+*	next and prev below, when multiplied by the size of SHikeLocationLink, is a
+*	physical offset from the start of the data stream.
+*	The first location (index 0) is the root.  See SHikeLocationRoot within
+*	HikeLocations.cpp for a description of its fields.
+*
+*	The location names are all uppercase.  strcmp is used for making comparisons.
+*	The "MT " prefix is skipped for comparison purposes (e.g. "MT ADAMS" == "ADAMS")
+*/
+typedef struct
+{
+	uint16_t		prev;		// Index of the previous location.  0 if head.
+	uint16_t		next;		// Index of the next location.  0 if tail.
+	SHikeLocation	loc;
+} SHikeLocationLink;
+
+
+class HikeLocations
+{
+public:
+							HikeLocations(void);
+	void					Initialize(
+								DataStream*				inLocations);
+	uint16_t				GetCount(void) const
+								{return(mCount);}
+	const SHikeLocationLink& GetCurrent(void) const			// Loaded location
+								{return(mCurrent);}
+	uint16_t				GetCurrentIndex(void) const		// Unsorted physical record index
+								{return(mCurrentIndex);}
+	int16_t					GetLogicalIndex(void) const;	// Sorted logical index
+							/*
+							*	Load the next sorted location
+							*/
+	bool					Next(
+								bool					inWrap = true);
+							/*
+							*	Gets the next sorted physical index without loading
+							*/
+	uint16_t				GetNextIndex(
+								bool					inWrap = true) const;
+							/*
+							*	Load the previous sorted location
+							*/
+	bool					Previous(
+								bool					inWrap = true);
+							/*
+							*	Gets the previous sorted physical index without loading
+							*/
+	uint16_t				GetPreviousIndex(
+								bool					inWrap = true) const;
+	void					GoToLocation(
+								uint16_t				inRecIndex);	// Unsorted physical record index
+	bool					GoToNthLocation(
+								uint16_t				inLogIndex);	// Sorted logical index
+	uint16_t				Add(
+								SHikeLocationLink&		inLocation);
+	bool					RemoveCurrent(void);
+	static inline HikeLocations&	GetInstance(void)
+								{return(sInstance);}
+protected:
+	static HikeLocations	sInstance;
+	DataStream*			mLocations;
+	SHikeLocationLink	mCurrent;
+	uint16_t			mCurrentIndex;
+	uint16_t			mCount;
+	
+	void					ReadLocation(
+								uint16_t				inIndex,	// Physical record index
+								void*					inLocation) const;
+	void					WriteLocation(
+								uint16_t				inIndex,	// Physical record index
+								const void*				inLocation) const;
+	bool					GoToRelativeLocation(
+								int16_t					inRelLogIndex);	// Relative sorted logical index
+	static const char*		SkipMTPrefix(
+								const char*				inName);
+};
+
+#endif // HikeLocations_h
