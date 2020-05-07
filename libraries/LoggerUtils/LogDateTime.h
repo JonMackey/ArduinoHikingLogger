@@ -24,6 +24,7 @@
 #define LogDateTime_h
 
 #include <inttypes.h>
+class DS3231SN;
 /*
 *	Rather than use time_t, which can be 32 or 64 bit depending on the target,
 *	an explicite 32 bit type is used instead.
@@ -68,7 +69,9 @@ public:
 								char*					outDayStr);
 #ifndef __MACH__
 	static void				RTCInit(
-								time32_t				inTime = 0);
+								time32_t				inTime = 0,
+								DS3231SN*				inExternalRTC = nullptr);
+	static void				SetTimeFromExternalRTC(void);
 	static void				RTCEnable(void);
 	static void				RTCDisable(void);
 #endif
@@ -100,6 +103,7 @@ public:
 								uint16_t*				outDate,
 								uint16_t*				outTime);
 protected:
+	static DS3231SN*		sExternalRTC;
 	static time32_t			sSleepTime;
 	static time32_t			sTime;
 	static bool				sTimeChanged;

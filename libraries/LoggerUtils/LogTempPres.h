@@ -54,7 +54,7 @@ public:
 							*	fails to send.  mIsValid will be set to true
 							*	by Set() once the BMP280 starts sending again.
 							*/
-	inline bool				MakeInvalid(void)
+	inline void				MakeInvalid(void)
 								{mIsValid = false;}
 	inline void				SetChanged(void)
 								{mTemperatureChanged = true; mPressureChanged = true;}

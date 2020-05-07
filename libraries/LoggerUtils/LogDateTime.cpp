@@ -23,6 +23,7 @@
 #include "LogDateTime.h"
 #ifndef __MACH__
 #include "LogSerialUtils.h"
+#include "DS3231SN.h"
 #include <Arduino.h>
 #include <avr/sleep.h>
 #else
@@ -45,6 +46,7 @@ const uint32_t	LogDateTime::kOneYear = 31557600;
 const time32_t	LogDateTime::kYear2000 = 946684800;	// Seconds from 1970 to 2000
 const uint16_t	LogDateTime::kDaysTo[] PROGMEM = {0, 31, 59, 90, 120, 151, 181, 212, 243, 273, 304, 334};
 const uint16_t	LogDateTime::kDaysToLY[] PROGMEM = {0, 31, 60, 91, 121, 152, 182, 213, 244, 274, 305, 335};
+DS3231SN*		LogDateTime::sExternalRTC;
 time32_t		LogDateTime::sTime;
 bool			LogDateTime::sTimeChanged;
 bool			LogDateTime::sFormat24Hour;	// false = 12, true = 24
@@ -58,96 +60,33 @@ time32_t			LogDateTime::sSleepTime;
 // date +%s		<< Unix command to get the local time
 
 #ifndef __MACH__
-#if 0
-/*
-	Sleep Mode notes - Idle is the only mode that seems to keep good time.
-		power save speeds up
-		standby slows down.
-		ADC speeds up.
-
-	This alternate method of implementing the RTC interrupt allows for fine
-	tuning of the time.  It's not helpful so it's not being used. It was used to
-	try to figure out how to keep the sleep modes from influencing the time.
-	Some cause the time to drift significantly faster or slower.  It may be
-	related to the DC to DC converter changing voltage when going into one of
-	the power save modes.  I finally gave up and decided not to put the MCU to
-	sleep. This makes other timing issues easier (e.g. BMP280 period), but it's
-	still annoying not to know why the time drift happens.
-*/
 /********************************** RTCInit ***********************************/
-/*
-*	This is the RTCInit for a 644 or 1284, and the rest of this family with
-*	a Timer2 section.
-*/
 void LogDateTime::RTCInit(
-	time32_t	inTime)
+	time32_t	inTime,
+	DS3231SN*	inExternalRTC)
 {
+	sExternalRTC = inExternalRTC;
 	cli();					// Disable interrupts
 	TIMSK2 &= ~((1<<TOIE2)|(1<<OCIE2A)|(1<<OCIE2B));		// Make sure all TC2 interrupts are disabled
-
-	ASSR = (1<<AS2);		// set Timer/counter0 to be asynchronous from the CPU clock
-							// with a second external clock (32,768kHz)driving it.
-	TCNT2 =0;				// Reset timer counter register
-	/*
-	*	Use CTC mode to fine tune the time by adjusting OCR2A.
-	*	On match with OCR2A the counter TCNT2 is reset to zero.
-	*	I could not get CTC mode 2 to work, on either the 644 or the 1284.
-	*	The symptom was/is that the reset never occured and it appeared to be
-	*	racing (interrupt called way too often.)
-	*	Mode 7, although not named CTC, has the same effect, and more
-	*	importantly, it works (i.e. it resets the counter on match.)
-	*/
-	TCCR2A = (1<<WGM20) | (1<<WGM21);	// Clear timer on compare match.							
-
-//	TCCR2B = ((1<<CS22)|(1<<CS21)|(0<<CS20)|(1<<WGM22));
-//	OCR2A  = 127;
-
-	TCCR2B = ((1<<CS22)|(0<<CS21)|(1<<CS20)|(1<<WGM22));
-	OCR2A  = 255;
-															
-	while ((ASSR & ((1 << OCR2AUB) | (1 << OCR2BUB) | (1 << TCR2AUB)
-        	| (1 << TCR2BUB) | (1<< TCN2UB))));	//Wait until TC2 is updated
 	
-	TIFR2  = (1 << TOV2) | (1 << OCF2A) | (1 << OCF2B);		// Clear pending interrupts
-	TIMSK2 = (1 << OCIE2A);					// Enable Timer 2 Output Compare Match Interrupt
-	sTime = inTime;
-	sei();									// Set the Global Interrupt Enable Bit
-}
+	/*
+	*	Set Timer/counter0 to be asynchronous from the CPU clock
+	*	with a second external clock (32,768kHz) driving it.
+	*
+	*	If using a single pin external 32KHz input source THEN
+	*	set the EXCLK input bit before enabling asynchronous operation.
+	*	Else, using a standard watch crystal as the 32KHz clock source.
+	*/
+	if (inExternalRTC)
+	{
+		// The doc states "Writing to EXCLK should be done before asynchronous operation is selected."
+		ASSR = _BV(EXCLK);
+		ASSR = (_BV(AS2)+_BV(EXCLK));
+	} else
+	{
+		ASSR = _BV(AS2);
+	}
 
-/********************************* RTCDisable *********************************/
-void LogDateTime::RTCDisable(void)
-{
-	// Power-Down mode is currently used to put the MCU to sleep so just
-	// disabling the interrupt should be enough.
-	cli();						// Disable interrupts
-	TIMSK2 &= ~(1<<OCIE2A);		// Disable all TC2 interrupts are disabled
-	sei();						// Set the Global Interrupt Enable Bit
-}
-
-
-/********************************* RTCEnable **********************************/
-void LogDateTime::RTCEnable(void)
-{
-	cli();						// Disable interrupts
-	TIMSK2 = (1 << OCIE2A);		// Enable Timer 2 Output Compare Match Interrupt
-	sei();						// Set the Global Interrupt Enable Bit
-}
-
-/******************* Timer 2 Output Compare Match Interrupt *******************/
-ISR(TIMER2_COMPA_vect)
-{
-	LogDateTime::Tick();
-}
-#else
-/********************************** RTCInit ***********************************/
-void LogDateTime::RTCInit(
-	time32_t	inTime)
-{
-	cli();					// Disable interrupts
-	TIMSK2 &= ~((1<<TOIE2)|(1<<OCIE2A)|(1<<OCIE2B));		// Make sure all TC2 interrupts are disabled
-
-	ASSR = (1<<AS2);										// set Timer/counter0 to be asynchronous from the CPU clock
-															// with a second external clock (32,768kHz)driving it.								
 	TCNT2 =0;												// Reset timer counter register
 
 	/*
@@ -156,11 +95,15 @@ void LogDateTime::RTCInit(
 	TCCR2A = (0<<WGM20) | (0<<WGM21);		// Overflow		
 	TCCR2B = ((1<<CS22)|(0<<CS21)|(1<<CS20)|(0<<WGM22));	// Prescale the timer to be clock source/128 to make it
 															// exactly 1 second for every overflow to occur
-															
+	
+	// Note that if there is no crystal OR no external clock source, this while() will hang														
 	while (ASSR & ((1<<TCN2UB)|(1<<OCR2AUB)|(1<<OCR2BUB)|(1<<TCR2AUB)|(1<<TCR2BUB))){}	//Wait until TC2 is updated
 	
 	TIMSK2 |= (1<<TOIE2);									// Set 8-bit Timer/Counter0 Overflow Interrupt Enable
-	sTime = inTime;
+	if (!inExternalRTC)
+	{
+		sTime = inTime;
+	}
 	sei();													// Set the Global Interrupt Enable Bit
 	
 }
@@ -189,7 +132,43 @@ ISR(TIMER2_OVF_vect)
 	LogDateTime::Tick();
 }
 #endif
-#endif
+
+/*************************** SetTimeFromExternalRTC ***************************/
+void LogDateTime::SetTimeFromExternalRTC(void)
+{
+	if (sExternalRTC)
+	{
+		DSDateTime	dateAndTime;
+		sExternalRTC->GetTime(dateAndTime);
+
+		time32_t time = kYear2000;
+		time += (dateAndTime.dt.year * 31536000);
+		{
+			uint16_t	days = pgm_read_word(&kDaysTo[dateAndTime.dt.month])
+									+ dateAndTime.dt.date;
+			/*
+			*	If past February AND
+			*	year is a leap year THEN
+			*	add a day
+			*/
+			if (dateAndTime.dt.month > 2 &&
+				(dateAndTime.dt.year % 4) == 0)
+			{
+				days++;
+			}
+			// Account for leap year days since 2000
+			days += (((dateAndTime.dt.year+3)/4)-1);
+			time += (days * kOneDay);
+		}
+		time += (((uint32_t)dateAndTime.dt.hour) * kOneHour);
+		time += (dateAndTime.dt.minute * kOneMinute);
+		time += dateAndTime.dt.second;
+		
+		cli();
+		sTime = time;
+		sei();
+	}
+}
 
 /********************************** SetTime ***********************************/
 void LogDateTime::SetTime(
@@ -198,6 +177,20 @@ void LogDateTime::SetTime(
 	cli();
 	sTime = inTime;
 	sei();
+	if (sExternalRTC)
+	{
+		DSDateTime	dateAndTime;
+		uint16_t	year;
+		TimeComponents(DateComponents(inTime, year,
+										dateAndTime.dt.month,
+										dateAndTime.dt.date),
+										dateAndTime.dt.hour,
+										dateAndTime.dt.minute,
+										dateAndTime.dt.second);
+		dateAndTime.dt.day = DayOfWeek(inTime)+1;
+		dateAndTime.dt.year = year - 2000;
+		sExternalRTC->SetTime(dateAndTime);
+	}
 }
 
 /********************************** SetTime ***********************************/
@@ -445,9 +438,7 @@ void LogDateTime::SetUnixTimeFromSerial(void)
 
 	if (unixTime)
 	{
-		cli();		// Disable interrupts
-		sTime = unixTime;
-		sei();		// Enable interrupts
+		SetTime(unixTime);
 	}
 	ResetSleepTime();
 }
