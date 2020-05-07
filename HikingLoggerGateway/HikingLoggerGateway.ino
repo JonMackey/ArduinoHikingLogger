@@ -41,7 +41,13 @@
 #include "AT24CDataStream.h"
 #include "AT24C.h"
 #include "MP3YX5200.h"	// MP3 player
+
+#define USE_EXTERNAL_RTC
+#ifdef USE_EXTERNAL_RTC
+#include "DS3231SN.h"
+#else
 #include "CompileTime.h"
+#endif
 
 //#define DEBUG_BMP280	1
 
@@ -121,7 +127,7 @@ static bool		sUpdateAll;
 
 MSPeriod	debouncePeriod(DEBOUNCE_DELAY);	// For buttons
 
-const uint8_t kAT24CDeviceAddr = 0x50;
+const uint8_t kAT24CDeviceAddr = 0x50;		// Serial EEPROM
 const uint8_t kAT24CDeviceCapacity = 32;	// Value at end of AT24Cxxx xxx/8
 AT24C	at24C(kAT24CDeviceAddr, kAT24CDeviceCapacity);
 const uint32_t	kHikeLocationsSize = 0x400; // 38 maximum (39 -1, -1 for the root)
@@ -141,16 +147,31 @@ LogAction	logAction;
 HikeLog		hikeLog;
 MP3YX5200WithSleep mp3Player(Serial1, kMP3RxPin, kMP3TxPin, kMP3PowerPin);
 
+#ifdef USE_EXTERNAL_RTC
+//const uint8_t kDS3231DeviceAddr = 0x68;	// RTC
+const uint8_t k32KHzInputPin = 22;		// PC6	PCINT22, 32KHz from RTC
+const uint8_t kRTCIntPin = 23;			// PC7	PCINT23, RTC interrupt
+DS3231SN	externalRTC;
+#endif
+
+
 /*********************************** setup ************************************/
 void setup(void)
 {
-	LogDateTime::RTCInit(UNIX_TIMESTAMP + 32);
 	Serial.begin(BAUD_RATE);
 	//Serial.println(F("Starting..."));
 	mp3Player.begin();
 
-	Wire.begin();
 	SPI.begin();
+	Wire.begin();
+#ifdef USE_EXTERNAL_RTC
+	externalRTC.begin();
+	LogDateTime::RTCInit(0, &externalRTC);
+	pinMode(kRTCIntPin, INPUT_PULLUP);
+	LogDateTime::SetTimeFromExternalRTC();
+#else
+	LogDateTime::RTCInit(UNIX_TIMESTAMP + 32);
+#endif
 
 	pinMode(kSDDetectPin, INPUT_PULLUP);
 	pinMode(kSDSelectPin, OUTPUT);
@@ -206,6 +227,8 @@ void setup(void)
 	PCICR = _BV(PCIE1) | _BV(PCIE2) | _BV(PCIE3);
 	
 	sei();
+#ifdef USE_EXTERNAL_RTC
+#endif
 
 	// Read the network and node IDs from EEPROM
 	{

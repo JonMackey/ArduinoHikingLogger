@@ -109,7 +109,7 @@ void RemoteLogLayout::DrawLocation(
 void RemoteLogLayout::ClearLines1to3(void)
 {
 	mDisplay->MoveTo(0,0);
-	mDisplay->FillBlock(29*3, 180, eBlack);
+	mDisplay->FillBlock(26*3, 180, eBlack);
 }
 char* Int16ToDecStr(
 	int16_t	inNum,
