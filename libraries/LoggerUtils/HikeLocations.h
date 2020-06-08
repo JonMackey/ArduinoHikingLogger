@@ -55,13 +55,28 @@ typedef struct
 	SHikeLocation	loc;
 } SHikeLocationLink;
 
+typedef struct
+{
+	uint16_t	tail;		// Index of the last location.
+	uint16_t	head;		// Index of the first location.  0xFFFF if none.
+	/*
+	*	freeHead is the location of the first free location.  This will only be
+	*	non-zero when a location is removed within the set of defined locations.
+	*	The length of the data stream determines the capacity.  freeHead only
+	*	indicates that there is fragmentation within the set of locations.
+	*/
+	uint16_t	freeHead;
+	// The root is the same size as a SHikeLocationLink
+	char		unused[20];
+} SHikeLocationRoot;
 
 class HikeLocations
 {
 public:
 							HikeLocations(void);
 	void					Initialize(
-								DataStream*				inLocations);
+								DataStream*				inLocations,
+								uint8_t					inSDSelectPin);
 	uint16_t				GetCount(void) const
 								{return(mCount);}
 	const SHikeLocationLink& GetCurrent(void) const			// Loaded location
@@ -69,6 +84,8 @@ public:
 	uint16_t				GetCurrentIndex(void) const		// Unsorted physical record index
 								{return(mCurrentIndex);}
 	int16_t					GetLogicalIndex(void) const;	// Sorted logical index
+	bool					IsValidIndex(
+								uint16_t				inRecIndex); // Unsorted physical record index
 							/*
 							*	Load the next sorted location
 							*/
@@ -96,6 +113,10 @@ public:
 	uint16_t				Add(
 								SHikeLocationLink&		inLocation);
 	bool					RemoveCurrent(void);
+#ifndef __MACH__
+	bool					LoadFromSD(void);
+	bool					SaveToSD(void);
+#endif
 	static inline HikeLocations&	GetInstance(void)
 								{return(sInstance);}
 protected:
@@ -104,6 +125,7 @@ protected:
 	SHikeLocationLink	mCurrent;
 	uint16_t			mCurrentIndex;
 	uint16_t			mCount;
+	uint8_t				mSDSelectPin;
 	
 	void					ReadLocation(
 								uint16_t				inIndex,	// Physical record index
@@ -115,6 +137,17 @@ protected:
 								int16_t					inRelLogIndex);	// Relative sorted logical index
 	static const char*		SkipMTPrefix(
 								const char*				inName);
+#ifndef __MACH__
+							/*
+							*	Used by SaveToSD to set the file creation date
+							*	and time to something reasonable.  The board
+							*	doesn't have an RTC so the time set the static
+							*	compile date/time.
+							*/
+	static void				SDFatDateTimeCB(
+								uint16_t*				outDate,
+								uint16_t*				outTime);
+#endif
 };
 
 #endif // HikeLocations_h

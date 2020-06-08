@@ -26,25 +26,16 @@
 
 #ifndef __MACH__
 #include <Arduino.h>
+#include "SdFat.h"
+#include "sdios.h"
+#include "CompileTime.h"
+#else
+#include <stdio.h>
 #endif
+#include "CSVUtils.h"
 
 
 HikeLocations	HikeLocations::sInstance;
-
-typedef struct
-{
-	uint16_t	tail;		// Index of the last location.
-	uint16_t	head;		// Index of the first location.  0xFFFF if none.
-	/*
-	*	freeHead is the location of the first free location.  This will only be
-	*	non-zero when a location is removed within the set of defined locations.
-	*	The length of the data stream determines the capacity.  freeHead only
-	*	indicates that there is fragmentation within the set of locations.
-	*/
-	uint16_t	freeHead;
-	// The root is the same size as a SHikeLocationLink
-	char		unused[20];
-} SHikeLocationRoot;
 
 /******************************** HikeLocations ********************************/
 HikeLocations::HikeLocations(void)
@@ -54,8 +45,10 @@ HikeLocations::HikeLocations(void)
 
 /********************************* Initialize *********************************/
 void HikeLocations::Initialize(
-	DataStream*	inLocations)
+	DataStream*	inLocations,
+	uint8_t		inSDSelectPin)
 {
+	mSDSelectPin = inSDSelectPin;
 	mLocations = inLocations;
 	if (mLocations)
 	{
@@ -83,7 +76,7 @@ void HikeLocations::Initialize(
 uint16_t HikeLocations::GetNextIndex(
 	bool	inWrap) const
 {
-	uint16_t	index = mCurrentIndex;
+	uint16_t	index = 0;
 	if (mCurrentIndex != 0)
 	{
 		if (mCurrent.next)
@@ -117,7 +110,7 @@ bool HikeLocations::Next(
 uint16_t HikeLocations::GetPreviousIndex(
 	bool	inWrap) const
 {
-	uint16_t	index = mCurrentIndex;
+	uint16_t	index = 0;
 	if (mCurrentIndex != 0)
 	{
 		if (mCurrent.prev)
@@ -338,6 +331,7 @@ uint16_t HikeLocations::Add(
 			} else
 			{
 				GoToLocation(root.head);
+				inLocation.prev = 0;
 				inLocation.next = root.head;
 				root.head = newIndex;
 				mCurrent.prev = newIndex;
@@ -432,6 +426,39 @@ bool HikeLocations::RemoveCurrent(void)
 	return(success);
 }
 
+/******************************** IsValidIndex ********************************/
+/*
+*	Returns true if the passed physical record index is valid.  In order to
+*	determine this the link list needs to be walked till the index is found.
+*	You can't simply check to see if it's less than the logical count because
+*	physical indexes don't move when a gate is removed, the index is only added
+*	to the freeHead chain.
+*/
+bool HikeLocations::IsValidIndex(
+	uint16_t	inRecIndex)
+{
+	bool isValid = false;
+	if (inRecIndex > 0)
+	{
+		SHikeLocationRoot	root;
+		ReadLocation(0, &root);
+		SHikeLocationLink	link;
+		uint16_t	next = root.head;
+		while (next)
+		{
+			if (next != inRecIndex)
+			{
+				ReadLocation(next, &link);
+				next = link.next;
+				continue;
+			}
+			isValid = true;
+			break;
+		}
+	}
+	return(isValid);
+}
+
 /******************************** ReadLocation ********************************/
 void HikeLocations::ReadLocation(
 	uint16_t		inIndex,
@@ -450,4 +477,156 @@ void HikeLocations::WriteLocation(
 	mLocations->Write(sizeof(SHikeLocationLink), inLocation);
 }
 
+#ifndef __MACH__
 
+const char kCSVFilename[] = "HikeLocations.csv";
+
+/********************************* LoadFromSD *********************************/
+/*
+	This routine attemps to open the CSV file named HikeLocations.csv.  The
+	original file should be created using SaveToSD().  The csv contains three
+	fields: ID, Name and Elevation.  The ID field should not be modified.  The
+	ID field is used to associate the edited name with the location. Only the
+	character set defined for the font used should be used in the name field.
+*/
+bool HikeLocations::LoadFromSD(void)
+{
+	SdFat sd;
+	bool	success = sd.begin(mSDSelectPin);
+	if (success)
+	{
+		SdFile file;
+		success = file.open(kCSVFilename, O_RDONLY);
+		if (success)
+		{
+			uint16_t			id;
+			SHikeLocationLink	link;
+			CSVUtils			csv(&file);
+			
+			char thisChar = csv.SkipLine();	// Skip the csv header line.
+			
+			while (thisChar != 0)
+			{
+				if ((thisChar = csv.ReadUint16(&id)) == ',' &&
+					((thisChar = csv.ReadStr(sizeof(link.loc.name), link.loc.name)) == ',') &&
+					((thisChar = csv.ReadUint16(&link.loc.elevation)) == '\n' || thisChar == 0))
+				{
+					if (id == 999 ||
+						IsValidIndex(id))
+					{
+						/*
+						*	If this isn't a new location THEN
+						*	update or delete it.
+						*/
+						if (id != 999)
+						{
+							/*
+							*	Remove and add this location to update the sort by name.
+							*	The physical index is the location ID.
+							*	Load the location with this id
+							*/
+							GoToLocation(id);
+						
+							/*
+							*	Update only if the data has changed
+							*/
+							if (GetCurrent().loc.elevation != link.loc.elevation ||
+								strcmp(GetCurrent().loc.name, link.loc.name))
+							{
+								/*
+								*	RemoveCurrent places the location link as the freeHead.
+								*	Add will reuse the freeHead.  This means that the
+								*	physical index (i.e. id) will remain the same.
+								*/
+								RemoveCurrent();
+							
+								/*
+								*	If the elevation is zero THEN
+								*	this is the flag to remove the location.
+								*	WARNING: The location will be reused for the
+								*	next new location added.  This affects any
+								*	summaries saved for the location being removed. 
+								*	The summaries only record the physical index and
+								*	blindly display whatever record is at the
+								*	physical index, even when it's in the free list.
+								*/
+								if (link.loc.elevation == 0)
+								{
+									continue;
+								}
+							} else
+							{
+								continue;
+							}
+						}
+						Add(link);
+					}
+				}
+			}
+		}
+		file.close();
+	} else
+	{
+		sd.initErrorHalt();
+	}
+	return(success);
+}
+
+/********************************** SaveToSD **********************************/
+/*
+	This routine overwrites or creates the CSV file named HikeLocations.csv. The
+	csv contains three fields: ID, Name and Elevation.  Only the name and
+	elevation fields should be edited by the user.  Only the character set
+	defined for the font used should be used in the name field.
+*/
+bool HikeLocations::SaveToSD(void)
+{
+	bool	success = mCount > 0;
+	if (success)
+	{
+		SdFat sd;
+		bool	success = sd.begin(mSDSelectPin);
+		if (success)
+		{
+			SdFile::dateTimeCallback(SDFatDateTimeCB);
+			SdFile file;
+			success = file.open(kCSVFilename, O_WRONLY | O_TRUNC | O_CREAT);
+			if (success)
+			{
+				CSVUtils	csv(&file);
+				file.println(F("ID,Name,Elevation"));
+				uint16_t	savedCurrent = mCurrentIndex;
+				GoToNthLocation(0);
+				char	quotedStr[50];
+				do	
+				{
+					file.print(mCurrentIndex);
+					file.write(',');
+					file.print(csv.QuoteForCSV(mCurrent.loc.name, quotedStr));
+					file.write(',');
+					file.println(mCurrent.loc.elevation);
+				} while(Next(false));
+				GoToNthLocation(savedCurrent);
+				file.close();
+			}
+		} else
+		{
+			sd.initErrorHalt();
+		}
+	}
+	return(success);
+}
+
+/****************************** SDFatDateTimeCB *******************************/
+/*
+*	SDFat date time callback.
+*/
+void HikeLocations::SDFatDateTimeCB(
+	uint16_t*	outDate,
+	uint16_t*	outTime)
+{
+	// The time macros come from CompileTime.h
+	*outDate = ((uint16_t)(__TIME_YEARS__ - 1980) << 9 | (uint16_t)__TIME_MONTH__ << 5 | __TIME_DAYS__);
+	*outTime = ((uint16_t)__TIME_HOURS__ << 11 | (uint16_t)__TIME_MINUTES__ << 5 | __TIME_SECONDS__ >> 1);
+}
+#endif

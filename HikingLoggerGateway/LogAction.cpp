@@ -116,8 +116,8 @@ void LogAction::IncrementMode(
 				}
 			}
 			break;
-		//eSDCardMode:	Moving in or out of eSDCardMode only occurs when the
-		//				card is inserted or removed.
+		//case eSDCardMode:	This mode is entered and existed based on whether
+		//					the SD card is present.
 	}
 	mMode = mode;
 	
@@ -184,6 +184,7 @@ void LogAction::EnterPressed(void)
 			break;
 		case eEndLocSelMode:
 			mMode = eLogMode;
+			mHikeLog->EndingLocIndex() = mLocIndex;
 			mLogStateModifier = HikeLog::eModifier;
 			break;
 		case eResetLogMode:
@@ -212,13 +213,15 @@ void LogAction::EnterPressed(void)
 			{
 				switch(mSDCardState)
 				{
-					case eSaveToSD:
-						mSDCardState = eSavingToSD;
+					case eSDCardIdle:
+						mSDCardState = mSDCardAction == eUpdateLocationsAction ?
+										eUpdatingFromSD : eSavingToSD;
 						break;
-					case eSDSaveError:
+					case eSDError:
 						mSDCardState = eEjectSDCardNoReset;
 						break;
-					case eSDWriteSuccess:
+					case eSDSavedSuccess:
+					case eSDUpdateSuccess:
 						mSDCardState = eEjectSDCardAllowReset;
 						break;
 				}
@@ -237,9 +240,19 @@ void LogAction::Update(void)
 	switch (mMode)
 	{
 		case eSDCardMode:
-			if (mSDCardState == eSavingToSD)
+			switch (mSDCardState)
 			{
-				mSDCardState = mHikeLog->SaveLogToSD() ? eSDWriteSuccess : eSDSaveError;
+				case eSavingToSD:
+				{
+					mSDCardState = ((mSDCardAction == eSaveHikeLogAction) ?
+									mHikeLog->SaveLogToSD() : 
+										HikeLocations::GetInstance().SaveToSD()) ?
+											eSDSavedSuccess : eSDError;
+					break;
+				}
+				case eUpdatingFromSD:
+					mSDCardState = HikeLocations::GetInstance().LoadFromSD() ? eSDUpdateSuccess : eSDError;
+					break;
 			}
 			break;
 	}
@@ -290,6 +303,25 @@ void LogAction::IncrementValue(
 				mHikeRef = mHikeLog->GetPrevSavedHikeRef(mHikeRef);
 			}
 			break;
+		case eSDCardMode:
+			if (mSDCardState == eSDCardIdle)
+			{
+				if (inIncrement)
+				{
+					mSDCardAction++;
+					if (mSDCardAction >= eNumSDCardActions)
+					{
+						mSDCardAction = eSaveHikeLogAction;
+					}
+				} else if (mSDCardAction)
+				{
+					mSDCardAction--;
+				} else
+				{
+					mSDCardAction = eUpdateLocationsAction;
+				}
+			}
+			break;
 	}
 }
 
@@ -305,14 +337,15 @@ void LogAction::SetSDCardPresent(
 	if (inSDCardPresent)
 	{
 		mMode = eSDCardMode;
-		mSDCardState = mHikeLog->Active() ? eEjectSDCardNoReset : eSaveToSD;
+		mSDCardState = mHikeLog->Active() ? eEjectSDCardNoReset : eSDCardIdle;
+		mSDCardAction = eSaveHikeLogAction;
 	/*
 	*	Else the card was just ejected
 	*/
 	} else
 	{
-		// If eSDWriteSuccess OR eEjectSDCardAllowReset
-		mMode = (mSDCardState & eSDWriteSuccess) != 0 ? eResetLogMode : eLogMode;
+		mMode = (mSDCardAction == eSaveHikeLogAction &&
+					mSDCardState == eSDSavedSuccess) ? eResetLogMode : eLogMode;
 		mResetLogState = eResetVerifyNo;
 	}
 }

@@ -37,12 +37,12 @@ public:
 	enum EMode
 	{
 		eLogMode,
-		eResetLogMode,		// + EResetLogState
+		eResetLogMode,			// + EResetLogState
 		eStartLocSelMode,
 		eEndLocSelMode,
 		eReviewHikesMode,
-		eBMP280SyncMode,	// + ESyncState
-		eSDCardMode			// + ESDCardState
+		eBMP280SyncMode,		// + ESyncState
+		eSDCardMode				// + ESDCardAction + ESDCardState 
 	};
 		
 	enum ESyncState
@@ -51,15 +51,25 @@ public:
 		eBMP280Syncing,
 		eBMP280SyncSuccess
 	};
+	
+	enum ESDCardAction
+	{
+		eSaveHikeLogAction,
+		eSaveLocationsAction,
+		eUpdateLocationsAction,
+		eNumSDCardActions
+	};
 
 	enum ESDCardState
 	{
-		eSaveToSD,				// 0 b000
-		eSavingToSD,			// 1 b001
-		eEjectSDCardNoReset,	// 2 b010
-		eSDSaveError,			// 3 b011
-		eSDWriteSuccess,		// 4 b100
-		eEjectSDCardAllowReset	// 5 b101
+		eSavingToSD,
+		eUpdatingFromSD,
+		eEjectSDCardNoReset,
+		eSDError,
+		eSDSavedSuccess,
+		eSDUpdateSuccess,
+		eEjectSDCardAllowReset,
+		eSDCardIdle
 	};
 	
 	enum EResetLogState
@@ -94,6 +104,8 @@ public:
 								{return(mSyncState);}
 	uint8_t					SDCardState(void) const
 								{return(mSDCardState);}
+	uint8_t					SDCardAction(void) const
+								{return(mSDCardAction);}
 	uint8_t					ResetLogState(void) const
 								{return(mResetLogState);}
 	uint8_t					LogStateModifier(void) const
@@ -121,13 +133,12 @@ protected:
 	uint8_t		mMode;
 	uint8_t		mSyncState;
 	uint8_t		mSDCardState;
+	uint8_t		mSDCardAction;
 	uint8_t		mResetLogState;
 	uint8_t		mLogStateModifier;
 	uint8_t		mReviewState;
 	bool		mSDCardPresent;
 	
-	void					SetActionIndex(
-								uint8_t					inActionIndex);
 	/*
 	*	All of the InitxxxPacket function declarations don't reference anything
 	*	from the Log namespace to avoid having to place LogPacket.h in this

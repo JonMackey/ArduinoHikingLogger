@@ -42,7 +42,7 @@
 #include "AT24C.h"
 #include "MP3YX5200.h"	// MP3 player
 
-#define USE_EXTERNAL_RTC
+//#define USE_EXTERNAL_RTC
 #ifdef USE_EXTERNAL_RTC
 #include "DS3231SN.h"
 #else
@@ -140,8 +140,8 @@ LogLayout	logLayout;
 // Define "xFont" to satisfy the auto-generated code with the font files
 // This implementation uses logLayout as a subclass of xFont
 #define xFont logLayout
-#include "MyriadPro-Regular_36.h"
 #include "MyriadPro-Regular_18.h"
+#include "MyriadPro-Regular_36_1b.h"
 
 LogAction	logAction;
 HikeLog		hikeLog;
@@ -251,7 +251,7 @@ void setup(void)
 		*/
 	}
 
-	xFont.SetDisplay(&display, &MyriadPro_Regular_36::font);
+	xFont.SetDisplay(&display, &MyriadPro_Regular_36_1b::font);
 	display.begin(2); // Init TFT
 	display.Fill();
 	
@@ -260,14 +260,14 @@ void setup(void)
 	*	Calling begin initialized the hikeLocations instance by counting the
 	*	number of locations on the associated stream.
 	*/
-	HikeLocations::GetInstance().Initialize(&locationsDataStream);
+	HikeLocations::GetInstance().Initialize(&locationsDataStream, kSDSelectPin);
 	hikeLog.Initialize(&logDataStream, kSDSelectPin);
 	//Serial.print(F("HikeLocations = "));
 	//Serial.println(HikeLocations::GetInstance().GetCount(), DEC);
 
 	LogDateTime::ResetSleepTime();
 	logLayout.Initialize(&logAction, &hikeLog,
-									&display, &MyriadPro_Regular_36::font,
+									&display, &MyriadPro_Regular_36_1b::font,
 												&MyriadPro_Regular_18::font);
 	logAction.Initialize(&radio, &hikeLog);
 	sUpdateAll = true;	// Update all data on display

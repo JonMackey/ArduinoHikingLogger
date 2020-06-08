@@ -64,6 +64,7 @@ protected:
 	uint8_t		mSyncState;
 	uint8_t		mResetLogState;
 	uint8_t		mSDCardState;
+	uint8_t		mSDCardAction;
 	uint8_t		mReviewState;
 
 	void					DrawLocation(

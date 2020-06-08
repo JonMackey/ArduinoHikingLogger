@@ -66,19 +66,25 @@ const LogLayout::SString_PDesc kSyncStateDesc[] PROGMEM =
 };
 
 const char kSaveToSDStr[] PROGMEM = "SAVE TO SD";
-const char kEnterToSaveStr[] PROGMEM = "ENTER TO SAVE";
-const char kSavingToSDStr[] PROGMEM = "SAVING TO SD...";
-const char kSDWriteSuccessStr[] PROGMEM = "SAVED TO SD";
+const char kSaveLocsStr[] PROGMEM = "SAVE LOCS";
+const char kUpdateLocsStr[] PROGMEM = "UPDATE LOCS";
+const char* kSDActionStr[] = {kSaveToSDStr, kSaveLocsStr, kUpdateLocsStr};
+
+const char kSavingStr[] PROGMEM = "SAVING...";
+const char kUpdatingStr[] PROGMEM = "UPDATING...";
 const char kEjectSDCardStr[] PROGMEM = "EJECT SD CARD";
-const char kSDSaveErrorStr[] PROGMEM = "SD ERROR";
+const char kSDErrorStr[] PROGMEM = "SD ERROR";
+const char kSavedStr[] PROGMEM = "SAVED";
+const char kUpdatedStr[] PROGMEM = "UPDATED";
 
 const LogLayout::SString_PDesc kSDCardStateDesc[] PROGMEM =
 {
-	{kEnterToSaveStr, XFont::eWhite},	// eSaveToSD
-	{kSavingToSDStr, XFont::eYellow},	// eSavingToSD
+	{kSavingStr, XFont::eYellow},		// eSavingToSD
+	{kUpdatingStr, XFont::eYellow},		// eUpdatingFromSD
 	{kEjectSDCardStr, XFont::eRed},		// eEjectSDCardNoReset
-	{kSDSaveErrorStr, XFont::eRed},		// eSDSaveError
-	{kSDWriteSuccessStr, XFont::eGreen},// eSDWriteSuccess
+	{kSDErrorStr, XFont::eRed},			// eSDError
+	{kSavedStr, XFont::eGreen},			// eSDSavedSuccess
+	{kUpdatedStr, XFont::eGreen},		// eSDUpdateSuccess
 	{kEjectSDCardStr, XFont::eGreen}	// eEjectSDCardAllowReset
 };
 
@@ -489,20 +495,24 @@ void LogLayout::Update(
 		case LogAction::eSDCardMode:
 		{
 			uint8_t	sdCardState = mLogAction->SDCardState();
-			
+			uint8_t	sdCardAction = mLogAction->SDCardAction();
 			
 			if (inUpdateAll ||
-				sdCardState != mSDCardState)
+				sdCardState != mSDCardState ||
+				sdCardAction != mSDCardAction)
 			{
+				mSDCardState = sdCardState;
+				mSDCardAction = sdCardAction;
 				ClearLines();
-				if (sdCardState == LogAction::eSaveToSD)
+				if (sdCardState == LogAction::eSDCardIdle)
 				{
 					MoveTo(0);
-					DrawTextOption(kSaveToSDStr, eCyan, false, true);
+					DrawTextOption(kSDActionStr[sdCardAction], eCyan, true, true);
+				} else
+				{
+					MoveTo(1);
+					DrawIndexedDescStr(kSDCardStateDesc, sdCardState, false, true);
 				}
-				MoveTo(1);
-				mSDCardState = sdCardState;
-				DrawIndexedDescStr(kSDCardStateDesc, sdCardState, false, true);
 			}
 			break;
 		}
