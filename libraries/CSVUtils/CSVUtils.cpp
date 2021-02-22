@@ -50,6 +50,58 @@ char CSVUtils::GetChar(void)
 #endif
 }
 
+/********************************* ReadUint8 **********************************/
+/*
+*	Consumes integer numbers till a delimiter, end of file, end of line or 
+*	a non-number is hit.
+*	Possible return values:
+*		0	= end of file, which may or may not be an error
+*		-1	= invalid character
+*		delimiter character, which may or may not be an error
+*		\n	 = end of line, which may or may not be an error
+*
+*	No overrun check is performed.
+*/
+char CSVUtils::ReadUint8(
+	uint8_t*	outValue)
+{
+	uint8_t	value = 0;
+	char		thisChar;
+
+	while((thisChar = GetChar()) != 0)
+	{
+		if (thisChar != mDelimiter)
+		{
+			if (thisChar != '\r')
+			{
+				if (thisChar != '\n')
+				{
+					if (thisChar >= '0' &&
+						thisChar <= '9')
+					{
+						value = (value*10) + (thisChar - '0');
+						continue;
+					}
+					// Else thisChar is invalid
+					thisChar = -1;
+				}
+			/*
+			*	If the next character isn't a newline THEN
+			*	this is an invalid character
+			*/
+			} else if ((thisChar = GetChar()) != 0 &&
+				thisChar != '\n')
+			{
+				thisChar = -1;	// Invalid character, expected a newline
+			}
+		}
+		break;
+	}
+	*outValue = value;
+
+	return(thisChar);
+}
+
 /********************************* ReadUint16 *********************************/
 /*
 *	Consumes integer numbers till a delimiter, end of file, end of line or 
@@ -59,6 +111,8 @@ char CSVUtils::GetChar(void)
 *		-1	= invalid character
 *		delimiter character, which may or may not be an error
 *		\n	 = end of line, which may or may not be an error
+*
+*	No overrun check is performed.
 */
 char CSVUtils::ReadUint16(
 	uint16_t*	outValue)
@@ -99,7 +153,6 @@ char CSVUtils::ReadUint16(
 
 	return(thisChar);
 }
-
 
 /********************************** ReadStr ***********************************/
 /*

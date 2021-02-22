@@ -65,6 +65,8 @@ public:
 	*/
 	void					SetFont(
 								Font*					inFont);
+	Font*					GetFont(void) const
+								{return(mFont);}
 	
 	/*
 	*	Relative move by N text rows and the absolute pixel column.

@@ -233,7 +233,13 @@ void MP3YX5200WithSleep::WakeUp(void)
 	*	enabling the serial pins and powering the MP3 section.  This small delay
 	*	allows the serial pins (now high) to backfeed enough power to the MP3
 	*	section capacitors so that when the MP3 section is powered on it doesn't
-	*	cause a brown out reset.
+	*	cause a brownout reset.
+	*
+	*	Update 19-FEB-2021: This delay may no longer be needed.  I added a 470uf
+	*	cap to the board at the location of the P channel MOSFET controlled by
+	*	mPowerPin to handle the inrush problem.  Without the cap the board would
+	*	brownout when the battery neared 4V.  It seems to be more of an issue in
+	*	the winter when the temp is below 25F.
 	*/
 	delay(2);
 	digitalWrite(mPowerPin, LOW);	// Turn on MP3 section

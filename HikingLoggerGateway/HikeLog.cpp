@@ -32,6 +32,7 @@
 const uint32_t kLogInterval = 4;	// Seconds
 const uint8_t kNumEntriesPerPass = 10;
 const char kFileExtStr[] PROGMEM = ".log";
+const char kSummariesFilenameStr[] PROGMEM = "HikeSum.bin";
 const uint32_t	kLogFileMarker = 0x484C4F47;	// HLOG
 
 const uint8_t kStartingLocEEAddr = 4;	// uint16_t
@@ -48,7 +49,7 @@ const uint16_t kMaxHikeSummaries = 125;	// sizeof(SHikeSummary) * kMaxHikeSummar
 *	[6]		uint16_t	lastEndingLocIndex;
 *	[8]		uint8_t		logInitialized;
 *	[9]		uint8_t		unassigned2[23];
-*	Storage of the last 100 hikes, circular storage, 20 byte struct
+*	Storage of the last 100 hikes, circular storage, 16 byte struct
 *	[32]	uint16_t	lastHikesHead
 *	[34]	uint16_t	lastHikesTail
 *	[36]	uint8_t		unassigned3[2];
@@ -553,6 +554,120 @@ bool HikeLog::SaveLogToSD(void)
 				mLogData->Seek(startPos, DataStream::eSeekSet);
 				break;
 			}
+		}
+	} else
+	{
+		sd.initErrorHalt();
+	}
+	return(success);
+}
+
+/**************************** SaveLogSummariesToSD ****************************/
+bool HikeLog::SaveLogSummariesToSD(void)
+{
+	SdFat sd;
+	bool	success = sd.begin(mSDSelectPin);
+	if (success)
+	{
+		SRingHeader		header;
+		struct SSummaryBlock
+		{
+			SHikeSummary	summary[5];	// Assumes kMaxHikeSummaries is 125, so 125/5 = 25, no remainder
+		} summaryBlock;
+		EEPROM.get(kLogRingAddressesEEAddr, header);
+		/*
+		*	[32]	uint16_t	lastHikesHead
+		*	[34]	uint16_t	lastHikesTail
+		*	[36]	uint8_t		unassigned3[2];
+		*	[38]	SHikeSummary hikes[kMaxHikeSummaries];  size = 16 bytes per hike
+		*/
+		sFileCreationTime = LogDateTime::Time();
+		SdFile::dateTimeCallback(SDFatDateTimeCB);
+		success = header.head != header.tail;
+		if (success)
+		{
+			/*
+			*	Create a file to hold the summaries.
+			*/
+			SdFile file;
+			{
+				char filename[15];
+				strcpy_P(filename, kSummariesFilenameStr);
+				sd.remove(filename);
+				success = file.open(filename, O_WRONLY | O_CREAT);
+			}
+			if (success)
+			{
+				success = file.write(&header, sizeof(SRingHeader)) == sizeof(SRingHeader);
+				uint16_t	summaryStorageEEAddr = kLogRingStorageEEAddr;
+				for (; success &&
+						summaryStorageEEAddr < (kLogRingStorageEEAddr + (sizeof(SHikeSummary) * kMaxHikeSummaries));
+							summaryStorageEEAddr += sizeof(SSummaryBlock))
+				{
+					EEPROM.get(summaryStorageEEAddr, summaryBlock);
+					success = file.write(&summaryBlock, sizeof(SSummaryBlock)) == sizeof(SSummaryBlock);
+				}
+				file.close();
+				Serial.println(success ? F("Success!") : F("Write Error"));
+			} else
+			{
+				Serial.println(F("Create Error"));
+			}
+		} else
+		{
+			Serial.println(F("No Summaries"));
+		}
+	} else
+	{
+		sd.initErrorHalt();
+	}
+	return(success);
+}
+
+/*************************** LoadLogSummariesFromSD ***************************/
+bool HikeLog::LoadLogSummariesFromSD(void)
+{
+	SdFat sd;
+	bool	success = sd.begin(mSDSelectPin);
+	if (success)
+	{
+		SRingHeader		header;
+		struct SSummaryBlock
+		{
+			SHikeSummary	summary[5];	// Assumes kMaxHikeSummaries is 125, so 125/5 = 25, no remainder
+		} summaryBlock;
+		/*
+		*	Open the summaries file.
+		*/
+		SdFile file;
+		{
+			char filename[15];
+			strcpy_P(filename, kSummariesFilenameStr);
+			success = file.open(filename, O_RDONLY);
+		}
+		if (success)
+		{
+			success = file.read(&header, sizeof(SRingHeader)) == sizeof(SRingHeader);
+			if (success)
+			{
+				EEPROM.put(kLogRingAddressesEEAddr, header);
+				Serial.println(F("Loading "));
+
+				uint16_t	summaryStorageEEAddr = kLogRingStorageEEAddr;
+				for (; success &&
+						summaryStorageEEAddr < (kLogRingStorageEEAddr + (sizeof(SHikeSummary) * kMaxHikeSummaries));
+							summaryStorageEEAddr += sizeof(SSummaryBlock))
+				{
+					success = file.read(&summaryBlock, sizeof(SSummaryBlock)) == sizeof(SSummaryBlock);
+					EEPROM.put(summaryStorageEEAddr, summaryBlock);
+					Serial.print('.');
+				}
+			}
+			file.close();
+			Serial.println(success ? F("Success!") : F("Read Error"));
+		} else
+		{
+			Serial.println(F("Open Error"));
 		}
 	} else
 	{

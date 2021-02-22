@@ -42,7 +42,7 @@
 #include "AT24C.h"
 #include "MP3YX5200.h"	// MP3 player
 
-//#define USE_EXTERNAL_RTC
+#define USE_EXTERNAL_RTC
 #ifdef USE_EXTERNAL_RTC
 #include "DS3231SN.h"
 #else
@@ -354,7 +354,7 @@ void loop(void)
 	{
 		mp3Player.Play(1);
 	}
-	
+		
 	hikeLog.LogEntryIfTime();
 	if (!sSleeping)
 	{
@@ -382,6 +382,16 @@ void loop(void)
 						Serial.print(F("\tendTime =\t0x"));
 						Serial.println(hikeSummary.endTime, HEX);
 					}
+					break;
+				}
+				case 's':
+				{
+					hikeLog.SaveLogSummariesToSD();
+					break;
+				}
+				case 'l':
+				{
+					hikeLog.LoadLogSummariesFromSD();
 					break;
 				}
 				case 'm':	// Test/play the first mp3.
@@ -482,7 +492,7 @@ void loop(void)
 					if (debouncePeriod.Passed())
 					{
 						sButtonPressed = false;
-						sStartPinsState = 0;
+						sStartPinsState = 0xFF;
 						switch (pinsState)
 						{
 							case _BV(PIND5):	// Up button pressed
@@ -559,9 +569,24 @@ void loop(void)
 	if (sSDInsertedOrRemoved)
 	{
 		WakeUp();
-		sSDInsertedOrRemoved = false;
 		LogDateTime::ResetSleepTime();
-		logAction.SetSDCardPresent(digitalRead(kSDDetectPin) == LOW);
+		uint8_t		pinsState = (~PINB) & _BV(PINB1);
+		/*
+		*	If debounced
+		*/
+		if (sStartPinsState == pinsState)
+		{
+			if (debouncePeriod.Passed())
+			{
+				sSDInsertedOrRemoved = false;
+				sStartPinsState = 0xFF;
+				logAction.SetSDCardPresent(pinsState != 0);
+			}
+		} else
+		{
+			sStartPinsState = pinsState;
+			debouncePeriod.Start();
+		}
 	}
 }
 
@@ -575,6 +600,9 @@ void WakeUp(void)
 	{
 		sSleeping = false;
 		display.WakeUp();
+	#ifdef USE_EXTERNAL_RTC
+		LogDateTime::SetTimeFromExternalRTC();
+	#endif
 		LogDateTime::ResetSleepTime();
 		LogTempPres::GetInstance().SetChanged();	// To force a redraw
 		sUpdateAll = true;	// Update all data on display

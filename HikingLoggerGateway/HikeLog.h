@@ -128,6 +128,8 @@ public:
 	bool					IsFull(void) const;
 	time32_t					SecondsTillFull(void) const;
 	bool					SaveLogToSD(void);
+	bool					SaveLogSummariesToSD(void);
+	bool					LoadLogSummariesFromSD(void);
 	void					StopLog(
 								time32_t					inEndTime = 0);							
 	inline time32_t			EndTime(void) const

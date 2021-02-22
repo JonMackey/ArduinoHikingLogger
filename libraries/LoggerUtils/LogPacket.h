@@ -1,5 +1,5 @@
 /*
-*	Log.h, Copyright Jonathan Mackey 2019
+*	LogPacket.h, Copyright Jonathan Mackey 2019
 *	RFM69 Packets used by the HikingLoggerGateway, HikingLoggerRemote, and
 *	BMP280Remote sketches
 *
@@ -21,8 +21,8 @@
 *	notices in any redistribution of this code.
 *
 */
-#ifndef Log_h
-#define Log_h
+#ifndef LogPacket_h
+#define LogPacket_h
 
 #include <inttypes.h>
 #include "HikeLocations.h"
@@ -190,4 +190,4 @@ namespace Log
 }				
 
 
-#endif // Log_h
+#endif // LogPacket_h

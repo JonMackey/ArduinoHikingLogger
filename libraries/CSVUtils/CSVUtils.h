@@ -38,6 +38,8 @@ public:
 							CSVUtils(
 								SdFile*					inFile,
 								char					inDelimiter = ',');
+	char					ReadUint8(
+								uint8_t*				outValue);
 	char					ReadUint16(
 								uint16_t*				outValue);
 	char					ReadStr(

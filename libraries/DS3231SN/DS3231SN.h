@@ -24,23 +24,17 @@
 #ifndef DS3231SN_H
 #define DS3231SN_H
 
-/*
-*	Rather than use time_t, which can be 32 or 64 bit depending on the target,
-*	an explicite 32 bit type is used instead.
-*/
-typedef uint32_t time32_t;
-
 union DSDateTime
 {
 	struct
 	{
-		uint8_t	second;
-		uint8_t	minute;
-		uint8_t	hour;
-		uint8_t	day;
-		uint8_t	date;
-		uint8_t	month;
-		uint8_t	year;
+		uint8_t	second;	// 0
+		uint8_t	minute;	// 1
+		uint8_t	hour;	// 2
+		uint8_t	day;	// 3
+		uint8_t	date;	// 4
+		uint8_t	month;	// 5
+		uint8_t	year;	// 6
 	} dt;
 	uint8_t	da[7];
 };
