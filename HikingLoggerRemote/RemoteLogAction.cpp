@@ -25,7 +25,7 @@
 #include "LogPacket.h"
 #include "RemoteHikeLog.h"
 #include "LogTempPres.h"
-#include "LogDateTime.h"
+#include "UnixTime.h"
 #include "RFM69.h"    // https://github.com/LowPowerLab/RFM69
 
 // When the gateway display is on, it can take up to 165ms or more to update
@@ -163,10 +163,10 @@ void RemoteLogAction::RightButtonPressed(void)
 				// Start or Resume
 				// If the log isn't active, then start
 				// if the log is stopped, then resume
-				QueueTimePacket(Log::kStartLog, LogDateTime::Time());
+				QueueTimePacket(Log::kStartLog, UnixTime::Time());
 			} else if (logState == RemoteHikeLog::eRunning)
 			{
-				QueueTimePacket(Log::kStopLog, LogDateTime::Time());
+				QueueTimePacket(Log::kStopLog, UnixTime::Time());
 			}
 			break;
 		}
@@ -382,8 +382,8 @@ void RemoteLogAction::HandleSyncPacketRx(void)
 	*	be ignored.  The test is only for when this remote has been in a deep
 	*	sleep for more than some period of time, stopping the RTC.
 	*/
-	int32_t	delta = (int32_t)packet->time-(int32_t)LogDateTime::Time();
-	LogDateTime::SetTime(packet->time);
+	int32_t	delta = (int32_t)packet->time-(int32_t)UnixTime::Time();
+	UnixTime::SetTime(packet->time);
 	/*
 	*	If waking from a deep sleep THEN
 	*	reset the sleep time.
@@ -396,7 +396,7 @@ void RemoteLogAction::HandleSyncPacketRx(void)
 		{
 			mMode = eInfoMode;
 		}
-		LogDateTime::ResetSleepTime();
+		UnixTime::ResetSleepTime();
 	}
 	
 #ifdef SUPPORT_LOC_SEL_MODES

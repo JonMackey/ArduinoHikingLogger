@@ -22,7 +22,7 @@
 */
 #include "RemoteLogLayout.h"
 #include "LogTempPres.h"
-#include "LogDateTime.h"
+#include "UnixTime.h"
 #include "RemoteHikeLog.h"
 #include "RemoteLogAction.h"
 #include "DisplayController.h"
@@ -139,9 +139,9 @@ void RemoteLogLayout::Update(
 		*/
 		case RemoteLogAction::eInfoMode:
 			if (inUpdateAll ||
-				LogDateTime::TimeChanged())
+				UnixTime::TimeChanged())
 			{
-				LogDateTime::ResetTimeChanged();
+				UnixTime::ResetTimeChanged();
 				char timeStr[32];
 				if (mHikeLog->Active())
 				{
@@ -155,16 +155,16 @@ void RemoteLogLayout::Update(
 						elapsedTime)
 					{
 						MoveTo(1);
-						LogDateTime::CreateTimeStr(elapsedTime, timeStr);
+						UnixTime::CreateTimeStr(elapsedTime, timeStr);
 						SetTextColor(eYellow);
 						DrawStr(timeStr);
 					}
 				}
-				bool isPM = LogDateTime::CreateTimeStr(timeStr);
+				bool isPM = UnixTime::CreateTimeStr(timeStr);
 				MoveTo(0,29);
 				SetTextColor(eWhite);
 				DrawStr(timeStr);
-				uint8_t showingAMPM = LogDateTime::Format24Hour() ? 0 : (isPM ? 1 : 2);
+				uint8_t showingAMPM = UnixTime::Format24Hour() ? 0 : (isPM ? 1 : 2);
 				/*
 				*	If updating everything OR
 				*	the AM/PM suffix state changed (to/from AM/PM or hidden) THEN

@@ -24,7 +24,7 @@
 #include <EEPROM.h>
 #include <string.h>
 #include "HikeLog.h"
-#include "LogDateTime.h"
+#include "UnixTime.h"
 #include "LogTempPres.h"
 #include "DataStream.h"
 #include "SdFat.h"
@@ -278,7 +278,7 @@ bool HikeLog::StartLog(
 		if (!mHike.startTime)
 		{
 			SHikeLogHeader logHeader;
-			logHeader.startTime = mHike.startTime = inStartTime == 0 ? LogDateTime::Time() : inStartTime;
+			logHeader.startTime = mHike.startTime = inStartTime == 0 ? UnixTime::Time() : inStartTime;
 			logHeader.endTime = mHike.endTime = 0;
 			logHeader.interval = kLogInterval;
 			UpdateStartingAltitude();	// Sets the location, then sets the starting altitude which updates the sea level pressure
@@ -302,7 +302,7 @@ bool HikeLog::StartLog(
 		*/
 		} else if (mHike.endTime)
 		{
-			mHike.startTime = LogDateTime::Time() - (mHike.endTime - mHike.startTime);
+			mHike.startTime = UnixTime::Time() - (mHike.endTime - mHike.startTime);
 			mHike.endTime = 0;
 			success = LogEntry();
 		}
@@ -338,7 +338,7 @@ bool HikeLog::LogEntry(void)
 	*	minutes as the starting temperature.
 	*/
 	if (LogTempPres::GetInstance().Ascending() &&
-		(LogDateTime::Time() - mHike.startTime) < (60 * 23) &&
+		(UnixTime::Time() - mHike.startTime) < (60 * 23) &&
 		mHike.startTemp > logEntry.temperature)
 	{
 		mHike.startTemp = logEntry.temperature;
@@ -357,7 +357,7 @@ bool HikeLog::LogEntry(void)
 	if (success)
 	{
 		mLogData->Seek(-(int32_t)(2*sizeof(uint32_t)), DataStream::eSeekCur);
-		mNextLogTime = LogDateTime::Time()+kLogInterval;
+		mNextLogTime = UnixTime::Time()+kLogInterval;
 	}
 	return(success);
 }
@@ -378,7 +378,7 @@ bool HikeLog::LogEntryIfTime(void)
 	if (LogTempPres::GetInstance().IsValid() &&
 		mHike.startTime &&
 		mHike.endTime == 0 &&
-		mNextLogTime <= LogDateTime::Time())
+		mNextLogTime <= UnixTime::Time())
 	{
 		success = LogEntry();
 	}
@@ -467,7 +467,7 @@ bool HikeLog::SaveLogToSD(void)
 		mLogData->Seek(0, DataStream::eSeekSet);
 		SHikeLogEntry	entry[kNumEntriesPerPass];
 		SHikeLogHeader	header;
-		sFileCreationTime = LogDateTime::Time();
+		sFileCreationTime = UnixTime::Time();
 		SdFile::dateTimeCallback(SDFatDateTimeCB);
 		while (success)
 		{
@@ -581,7 +581,7 @@ bool HikeLog::SaveLogSummariesToSD(void)
 		*	[36]	uint8_t		unassigned3[2];
 		*	[38]	SHikeSummary hikes[kMaxHikeSummaries];  size = 16 bytes per hike
 		*/
-		sFileCreationTime = LogDateTime::Time();
+		sFileCreationTime = UnixTime::Time();
 		SdFile::dateTimeCallback(SDFatDateTimeCB);
 		success = header.head != header.tail;
 		if (success)
@@ -682,7 +682,7 @@ void HikeLog::StopLog(
 {
 	if (mHike.startTime && !mHike.endTime)
 	{
-		mHike.endTime = inEndTime == 0 ? LogDateTime::Time() : inEndTime;
+		mHike.endTime = inEndTime == 0 ? UnixTime::Time() : inEndTime;
 		mHike.endTemp = (int16_t)LogTempPres::GetInstance().PeekTemperature();
 	}
 }
@@ -691,7 +691,7 @@ void HikeLog::StopLog(
 time32_t HikeLog::ElapsedTime(void) const
 {
 	// if the log is stopped ? () : if there is an active log ? () : no active log, return 0
-	return(mHike.endTime ? (mHike.endTime - mHike.startTime) : (mHike.startTime ? (LogDateTime::Time() - mHike.startTime) : 0));
+	return(mHike.endTime ? (mHike.endTime - mHike.startTime) : (mHike.startTime ? (UnixTime::Time() - mHike.startTime) : 0));
 }
 
 /****************************** SDFatDateTimeCB *******************************/
@@ -702,7 +702,7 @@ void HikeLog::SDFatDateTimeCB(
 	uint16_t*	outDate,
 	uint16_t*	outTime)
 {
-	LogDateTime::SDFatDateTime(sFileCreationTime, outDate, outTime);
+	UnixTime::SDFatDateTime(sFileCreationTime, outDate, outTime);
 }
 
 // The hike summaries stored in the MCU's EEPROM

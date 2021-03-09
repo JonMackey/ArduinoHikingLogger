@@ -1,6 +1,6 @@
 /*
-*	LogAction.h, Copyright Jonathan Mackey 2019
-*	Handles input from the UI.
+*	LogUI.h, Copyright Jonathan Mackey 2021
+*	Handles the UI.
 *
 *	GNU license:
 *	This program is free software: you can redistribute it and/or modify
@@ -20,20 +20,29 @@
 *	notices in any redistribution of this code.
 *
 */
-#ifndef LogAction_h
-#define LogAction_h
+#ifndef LogUI_h
+#define LogUI_h
 
 #include <inttypes.h>
 #include <time.h>
 #include "MSPeriod.h"
-class RFM69;
-class XFont;
+#include "MP3YX5200.h"	// MP3 player
+#include "UnixTimeEditor.h"
+#include "RFM69.h"    // https://github.com/LowPowerLab/RFM69
+#include "XFont.h"
+
+typedef uint32_t time32_t;
 class HikeLog;
 
-class LogAction
+class LogUI : public XFont
 {
 public:
-							LogAction(void);
+	struct SString_PDesc
+	{
+		const char*	descStr;
+		uint16_t	color;
+	};
+							LogUI(void);
 	enum EMode
 	{
 		eLogMode,
@@ -41,6 +50,9 @@ public:
 		eStartLocSelMode,
 		eEndLocSelMode,
 		eReviewHikesMode,
+		eSetTimeMode,
+		eEditTimeMode,
+		eTestMP3Mode,
 		eBMP280SyncMode,		// + ESyncState
 		eSDCardMode				// + ESDCardAction + ESDCardState 
 	};
@@ -54,7 +66,7 @@ public:
 	
 	enum ESDCardAction
 	{
-		eSaveHikeLogAction,
+		eSaveHikeLogUI,
 		eSaveLocationsAction,
 		eUpdateLocationsAction,
 		eNumSDCardActions
@@ -86,9 +98,11 @@ public:
 		eReviewData
 	};
 
-	void					Initialize(
-								RFM69*					inRadio,
-								HikeLog*				inHikeLog);
+	void					begin(
+								HikeLog*				inHikeLog,
+								DisplayController*		inDisplay,
+								Font*					inNormalFont,
+								Font*					inSmallFont);
 	void					SetSDCardPresent(
 								bool					inSDCardPresent);
 	void					SetSDWriteSuccessAction(void);
@@ -118,14 +132,25 @@ public:
 								{return(mReviewState);}
 								
 	void					EnterPressed(void);
-	void					IncrementMode(
+	void					UpDownButtonPressed(
 								bool					inIncrement);
-	void					IncrementValue(
+	void					LeftRightButtonPressed(
 								bool					inIncrement);
 	void					Update(void);
+	// The following 2 routines are used by ISRs
+	static void				SetSDInsertedOrRemoved(void)
+								{sSDInsertedOrRemoved = true;}
+	static void				SetButtonPressed(
+								bool					inButtonPressed)
+								{sButtonPressed = sButtonPressed || inButtonPressed;}
 protected:
-	RFM69*		mRadio;
+	RFM69		mRadio;
+	MP3YX5200WithSleep mMP3Player;
+	UnixTimeEditor	mUnixTimeEditor;
 	HikeLog*	mHikeLog;
+	Font*		mNormalFont;
+	Font*		mSmallFont;
+	MSPeriod	mDebouncePeriod;	// For buttons and SD card
 	MSPeriod	mBMP280Period;
 	MSPeriod	m3ButtonRemotePeriod;
 	uint16_t	mLocIndex;	// for eStartLocSelMode and eEndLocSelMode
@@ -137,8 +162,23 @@ protected:
 	uint8_t		mResetLogState;
 	uint8_t		mLogStateModifier;
 	uint8_t		mReviewState;
+	uint8_t		mStartPinState;
 	bool		mSDCardPresent;
+	bool		mSleeping;
+
+	uint8_t		mPrevLogState;
+	uint8_t		mPrevMode;
+	uint16_t	mPrevLocIndex;
+	uint16_t	mPrevHikeRef;
+	uint8_t		mPrevShowingAMPM;
+	uint8_t		mPrevSyncState;
+	uint8_t		mPrevResetLogState;
+	uint8_t		mPrevSDCardState;
+	uint8_t		mPrevSDCardAction;
+	uint8_t		mPrevReviewState;
 	
+	static bool	sButtonPressed;
+	static bool	sSDInsertedOrRemoved;
 	/*
 	*	All of the InitxxxPacket function declarations don't reference anything
 	*	from the Log namespace to avoid having to place LogPacket.h in this
@@ -152,6 +192,29 @@ protected:
 	bool					HandleBMP280PacketRx(void);
 	void					HandlePacketRx(void);
 
+	void					WakeUp(void);
+	void					GoToSleep(void);
+	void					UpdateDisplay(void);
+	void					DrawLocation(
+								uint16_t				inLocIndex,
+								uint8_t					inFirstLine = 1);
+	void					DrawTime(
+								time32_t				inTime,
+								bool					inShowingAMPM);
+	void					DrawIndexedDescStr(
+								const SString_PDesc*	inStringList,
+								uint8_t					inStrIndex,
+								bool					inHasOptions,
+								bool					inCentered);
+	void					DrawTextOption(
+								const char*				inStrRef,
+								uint16_t				inColor,
+								bool					inHasOptions,
+								bool					inCentered);
+	void					ClearLines(
+								uint8_t					inStartLine = 0,
+								uint8_t					inNumLines = 3);
+
 };
 
-#endif // LogAction_h
+#endif // LogUI_h

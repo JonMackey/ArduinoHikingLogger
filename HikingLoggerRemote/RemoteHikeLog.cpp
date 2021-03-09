@@ -22,7 +22,7 @@
 */
 //#include <Arduino.h>
 #include "RemoteHikeLog.h"
-#include "LogDateTime.h"
+#include "UnixTime.h"
 #include "LogTempPres.h"
 #include <string.h>
 
@@ -58,7 +58,7 @@ void RemoteHikeLog::SwapLocIndexes(void)
 time32_t RemoteHikeLog::ElapsedTime(void) const
 {
 	// if the log is stopped ? () : if there is an active log ? () : no active log, return 0
-	return(mEndTime ? (mEndTime - mStartTime) : (mStartTime ? (LogDateTime::Time() - mStartTime) : 0));
+	return(mEndTime ? (mEndTime - mStartTime) : (mStartTime ? (UnixTime::Time() - mStartTime) : 0));
 }
 
 /************************************ Sync ************************************/

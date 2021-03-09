@@ -21,7 +21,7 @@
 
 #include "LogTempPres.h"
 #include "BMP280Utils.h"
-#include "LogDateTime.h"
+#include "UnixTime.h"
 
 LogTempPres		LogTempPres::sInstance;
 const char LogTempPres::kCTempSuffixStr[] = "°C"; // Degree glyph, U00B0 UTF-8 C2 B0
@@ -68,9 +68,9 @@ time32_t LogTempPres::Set(
 	*/
 	if (pressureChanged)
 	{
-		mTimePressureChanged = LogDateTime::Time();
+		mTimePressureChanged = UnixTime::Time();
 	}
- 	return(pressureChanged ? 0 : (LogDateTime::Time() - mTimePressureChanged));
+ 	return(pressureChanged ? 0 : (UnixTime::Time() - mTimePressureChanged));
 }
 
 /**************************** SetStartingAltitude *****************************/

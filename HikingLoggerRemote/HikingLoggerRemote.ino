@@ -28,7 +28,7 @@
 #include "TFT_ST7735S.h"
 #include "RFM69.h"    // https://github.com/LowPowerLab/RFM69
 
-#include "LogDateTime.h"
+#include "UnixTime.h"
 #include "LogTempPres.h"
 #include "RemoteLogLayout.h"
 #include "RemoteLogAction.h"
@@ -119,7 +119,7 @@ uint32_t	sLastMS;
 /*********************************** setup ************************************/
 void setup(void)
 {
-	LogDateTime::RTCInit();
+	UnixTime::RTCInit();
 	set_sleep_mode(SLEEP_MODE_IDLE);
 
 #ifdef BAUD_RATE
@@ -181,7 +181,7 @@ void setup(void)
 	display.begin(3); // Init TFT
 	display.Fill();
 	
-	LogDateTime::ResetSleepTime();
+	UnixTime::ResetSleepTime();
 	remoteLogLayout.Initialize(&remoteLogAction, &remoteHikeLog,
 									&display, &MyriadPro_Regular_24::font,
 										&MyriadPro_Regular_14::font);
@@ -229,7 +229,7 @@ void loop(void)
 			switch (Serial.read())
 			{
 				case '>':
-					LogDateTime::SetUnixTimeFromSerial();
+					UnixTime::SetUnixTimeFromSerial();
 					break;
 				case 'D':
 				case 'd':
@@ -245,7 +245,7 @@ void loop(void)
 	#endif
 		if (sButtonPressed)
 		{
-			LogDateTime::ResetSleepTime();
+			UnixTime::ResetSleepTime();
 			/*
 			*	If a debounce period has passed
 			*/
@@ -313,7 +313,7 @@ void loop(void)
 					debouncePeriod.Start();
 				}
 			}
-		} else if (LogDateTime::TimeToSleep())
+		} else if (UnixTime::TimeToSleep())
 		{
 			GoToSleep();
 		}
@@ -330,9 +330,9 @@ void loop(void)
 		*/
 		if ((((~PIND) & kPINDBtnMask) + ((~PINB) & kPINBBtnMask)) == _BV(PINB2))
 		{
-			if (LogDateTime::TimeToSleep())
+			if (UnixTime::TimeToSleep())
 			{
-				LogDateTime::ResetSleepTime();
+				UnixTime::ResetSleepTime();
 				/*
 				*	When pressed after eLightSleep the period is DEBOUNCE_DELAY.
 				*	When pressed after eDeepSleep the period is DEEP_SLEEP_DELAY.
@@ -384,7 +384,7 @@ void WakeUp(void)
 {
 	sSleepMode = eAwake;
 	display.WakeUp();
-	LogDateTime::ResetSleepTime();
+	UnixTime::ResetSleepTime();
 	LogTempPres::GetInstance().SetChanged();	// To force a redraw
 	sUpdateAll = true;	// Update all data on display
 #ifdef BAUD_RATE
@@ -443,7 +443,7 @@ void GoToDeepSleep(void)
 */
 void DeepSleep(void)
 {
-	LogDateTime::RTCDisable();
+	UnixTime::RTCDisable();
 	set_sleep_mode(SLEEP_MODE_PWR_DOWN);
 	cli();
 	sleep_enable();
@@ -453,8 +453,8 @@ void DeepSleep(void)
 	sleep_disable();
 	sei();
 	set_sleep_mode(SLEEP_MODE_IDLE);
-	LogDateTime::SetTime(0);
-	LogDateTime::RTCEnable();
+	UnixTime::SetTime(0);
+	UnixTime::RTCEnable();
 }
 
 /************************* Pin change interrupt PCI1 **************************/
