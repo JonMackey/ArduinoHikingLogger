@@ -429,9 +429,9 @@ bool HikeLocations::RemoveCurrent(void)
 /******************************** IsValidIndex ********************************/
 /*
 *	Returns true if the passed physical record index is valid.  In order to
-*	determine this the link list needs to be walked till the index is found.
+*	determine this, the link list needs to be walked till the index is found.
 *	You can't simply check to see if it's less than the logical count because
-*	physical indexes don't move when a gate is removed, the index is only added
+*	physical indexes don't move when a location is removed, the index is only added
 *	to the freeHead chain.
 */
 bool HikeLocations::IsValidIndex(

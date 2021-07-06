@@ -3,11 +3,14 @@ I2CScanner
 OLEDFontTest
 OscillatorTest
 TFTFontTest
+LapCounter
 XavusMobileSensor
+LCD_SD7567_Test
 MCP9808
 SIM7000
 RFM69_LowPowerLab
 SdFat
+_DelSyncFiles
 *.syncfolderspro
 MyriadPro-Regular_18.h
 MyriadPro-Regular_36.h
