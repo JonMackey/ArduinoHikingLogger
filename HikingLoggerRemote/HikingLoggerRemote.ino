@@ -28,7 +28,7 @@
 #include "TFT_ST7735S.h"
 #include "RFM69.h"    // https://github.com/LowPowerLab/RFM69
 
-#include "UnixTime.h"
+#include "ATmega644RTC.h"
 #include "LogTempPres.h"
 #include "RemoteLogLayout.h"
 #include "RemoteLogAction.h"
@@ -96,6 +96,8 @@ static uint8_t	sStartPinsState;
 static uint8_t	sLastPinsState;
 static bool		sButtonPressed = false;
 static bool		sUpdateAll;
+static uint8_t	sNetworkID;
+static uint8_t	sNodeID;
 
 MSPeriod	debouncePeriod(DEBOUNCE_DELAY);	// for buttons
 
@@ -119,7 +121,7 @@ uint32_t	sLastMS;
 /*********************************** setup ************************************/
 void setup(void)
 {
-	UnixTime::RTCInit();
+	ATmega644RTC::RTCInit();
 	set_sleep_mode(SLEEP_MODE_IDLE);
 
 #ifdef BAUD_RATE
@@ -171,10 +173,10 @@ void setup(void)
 
 	// Read the network and node IDs from EEPROM
 	{
-		uint8_t	networkID = EEPROM.read(0);
-		uint8_t	nodeID = EEPROM.read(1);
+		sNetworkID = EEPROM.read(0);
+		sNodeID = EEPROM.read(1);
 
-		radio.initialize(FREQUENCY, nodeID, networkID);
+		radio.initialize(FREQUENCY, sNodeID, sNetworkID);
 	}
 	radio.sleep();
 
@@ -382,6 +384,7 @@ void loop(void)
 */
 void WakeUp(void)
 {
+	radio.initialize(FREQUENCY, sNodeID, sNetworkID);
 	sSleepMode = eAwake;
 	display.WakeUp();
 	UnixTime::ResetSleepTime();
@@ -443,7 +446,7 @@ void GoToDeepSleep(void)
 */
 void DeepSleep(void)
 {
-	UnixTime::RTCDisable();
+	ATmega644RTC::RTCDisable();
 	set_sleep_mode(SLEEP_MODE_PWR_DOWN);
 	cli();
 	sleep_enable();
@@ -454,7 +457,7 @@ void DeepSleep(void)
 	sei();
 	set_sleep_mode(SLEEP_MODE_IDLE);
 	UnixTime::SetTime(0);
-	UnixTime::RTCEnable();
+	ATmega644RTC::RTCEnable();
 }
 
 /************************* Pin change interrupt PCI1 **************************/

@@ -205,6 +205,7 @@ public:
 		eBrown		= 0x43D5,
 		ePurple		= 0x9112,
 		eOrange		= 0x049F,
+		eLightBlue	= 0xFD60,
 		eGray		= 0xCE79,
 		eWhite		= 0xFFFF
 	};

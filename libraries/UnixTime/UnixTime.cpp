@@ -1,5 +1,5 @@
 /*
-*	UnixTime.cpp, Copyright Jonathan Mackey 2020
+*	UnixTime.cpp, Copyright Jonathan Mackey 2021
 *	Class to manage the date and time.  This does not handle leap seconds.
 *
 *	GNU license:
@@ -143,6 +143,91 @@ void UnixTime::SetTime(
 	}
 }
 #endif
+
+/****************************** StringToUnixTime ******************************/
+/*
+*	Converts a cell modem time string to Unix time.
+*
+*	This conversion is for values returned by cell modem command AT+CCLK and the
+*	unsolicited *PSUTTZ automatic time update.  For CCLK inDateTimeStr is local
+*	time of the form YY/MM/DD,hh:mm:ss+-uu", where +-uu is the deviation from
+*	GMT in quarter hours for the local timezone.  The timezone is ignored for
+*	CCLK because only the local time is needed. For *PSUTTZ, inDateTimeStr is
+*	UTC of the form YY/MM/DD,hh:mm:ss","+-uu",DST, where +-uu is the deviation
+*	from GMT in quarter hours for the local timezone, and DST is 0/1 signifying
+*	the whether daylight savings time is active for this timezone.
+*	DST is ignored.
+*	
+*	The timezone is in quarter hours off of GMT.  e.g. -18 = -04:30:0.  
+*
+*	When parsing for timezone, quotes and commas are ignored.
+*	No format validation is performed (shit in, shit out.)
+*
+*	Ex 21/07/26,13:25:53-16" = 26-JUL-2021 1:25PM
+*	If inAdjustForTimezone
+*		21/07/26,17:25:53","-16",1 = 26-JUL-2021 1:25PM EST, DST is active
+*/
+time32_t UnixTime::StringToUnixTime(
+	const char*	inDateTimeStr,
+	bool		inAdjustForTimezone)
+{
+	time32_t time = kYear2000;
+	uint8_t	year = StrDecValue(&inDateTimeStr[0]);
+	if (year < 80)
+	{
+		time += (year * 31536000);
+		{
+			uint8_t		month = StrDecValue(&inDateTimeStr[3]) -1;
+			uint16_t	days = pgm_read_word(&kDaysTo[month]) + StrDecValue(&inDateTimeStr[6]);
+			/*
+			*	If past February AND
+			*	year is a leap year THEN
+			*	add a day
+			*/
+			if (month > 2 &&
+				(year % 4) == 0)
+			{
+				days++;
+			}
+			// Account for leap year days since 2000
+			days += (((year+3)/4)-1);
+			time += (days * kOneDay);
+		}
+		time += ((uint32_t)StrDecValue(&inDateTimeStr[9]) * kOneHour);
+		time += (StrDecValue(&inDateTimeStr[12]) * kOneMinute);
+		time += StrDecValue(&inDateTimeStr[15]);
+		if (inAdjustForTimezone)
+		{
+			const char*	tzPtr = &inDateTimeStr[17];
+			char thisChar = *(tzPtr++);
+			for (; thisChar; thisChar = *(tzPtr++))
+			{
+				// Ignore quotes and commas
+				if (thisChar == '\"' ||
+					thisChar == ',')
+				{
+					continue;
+				}
+				uint16_t tzAdjustment = StrDecValue(tzPtr) * kOneMinute * 15;
+				if (thisChar == '-')
+				{
+					time -= tzAdjustment;
+				} else
+				{
+					time += tzAdjustment;
+				}
+				break;
+			}
+		}
+	} else
+	{
+		// Only happens after the battery has been removed and there has been
+		// no connection to a cell tower or automatic time updates have not been
+		// enabled by sending AT+CLTS=1 to the modem.
+		time = 0;
+	}
+	return(time);
+}
 
 /****************************** StringToUnixTime ******************************/
 /*

@@ -21,7 +21,9 @@
 *
 */
 #include "SerialUtils.h"
+#ifndef __MACH__
 #include <Arduino.h>
+#endif
 
 /**************************** GetUInt32FromSerial *****************************/
 uint32_t SerialUtils::GetUInt32FromSerial(void)

@@ -1,5 +1,5 @@
 /*
-*	UnixTime.h, Copyright Jonathan Mackey 2020
+*	UnixTime.h, Copyright Jonathan Mackey 2021
 *
 *	Utility class for converting to/from Unix time.
 *
@@ -44,6 +44,9 @@ public:
 	static time32_t			StringToUnixTime(
 								const char*				inDateStr,
 								const char*				inTimeStr);
+	static time32_t			StringToUnixTime(
+								const char*				inDateTimeStr,
+								bool					inAdjustForTimezone=false);
 	static void				TimeComponents(
 								time32_t				inTime,
 								uint8_t&				outHour,
@@ -120,6 +123,8 @@ public:
 								{sTimeChanged = false;}
 	static void				SetUnixTimeFromSerial(void);													
 	static void				ResetSleepTime(void);
+	static uint32_t			SleepDelay(void)
+								{return(sSleepDelay);}
 	static inline bool		TimeToSleep(void)
 								{return(sSleepTime < Time());}
 	static void				SetSleepDelay(
