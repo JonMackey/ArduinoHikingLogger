@@ -294,9 +294,13 @@ void RemoteLogLayout::Update(
 				logState != mLogState)
 			{
 				mLogState = logState;
+				/*
+				*	If the log state changed...
+				*/
 				if (!inUpdateAll)
 				{
 					ClearLines1to3();
+					mLogAction->LogStateChanged();
 				}
 				MoveTo(0,0);
 				{

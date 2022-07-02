@@ -64,6 +64,7 @@ public:
 	uint8_t					Mode(void) const
 								{return(mMode);}
 	void					GoToInfoMode(void);
+	void					LogStateChanged(void);
 			
 	uint8_t					SyncState(void) const
 								{return(mSyncState);}
@@ -90,6 +91,7 @@ protected:
 	MSPeriod		mPacketTimoutPeriod;
 	RFM69*			mRadio;
 	RemoteHikeLog*	mHikeLog;
+	time32_t		mStartStopMessageTime;	// See RightButtonPressed
 	uint8_t			mMode;
 	uint8_t			mSyncState;
 	/*

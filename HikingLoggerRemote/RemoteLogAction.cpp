@@ -149,6 +149,17 @@ void RemoteLogAction::LeftButtonPressed(void)
 	}
 }
 
+/****************************** LogStateChanged *******************************/
+void RemoteLogAction::LogStateChanged(void)
+{
+	/*
+	*	mStartStopMessageTime is the time of the last kStopLog or kStartLog sent.
+	*	mStartStopMessageTime is reset here because the packet was sucessfully
+	*	sent if the log state changed.
+	*/
+	mStartStopMessageTime = 0;
+}
+
 /***************************** RightButtonPressed *****************************/
 void RemoteLogAction::RightButtonPressed(void)
 {
@@ -157,16 +168,31 @@ void RemoteLogAction::RightButtonPressed(void)
 		case eLogMode:
 		{
 			uint8_t	logState = mHikeLog->GetLogState();
-			if (logState == RemoteHikeLog::eStopped ||
-				logState == RemoteHikeLog::eNotRunning)
+			if (logState != RemoteHikeLog::eCantRun)
 			{
-				// Start or Resume
-				// If the log isn't active, then start
-				// if the log is stopped, then resume
-				QueueTimePacket(Log::kStartLog, UnixTime::Time());
-			} else if (logState == RemoteHikeLog::eRunning)
-			{
-				QueueTimePacket(Log::kStopLog, UnixTime::Time());
+				/*
+				*	Because the packet send can fail, the time of the original
+				*	button press is used in case of a failure (mStartStopMessageTime.)
+				*
+				*	Example: You pressed stop, but the send failed for whatever
+				*	reason.  You then press stop again.  You would want the time
+				*	of the original button press used, not the current time.
+				*
+				*	If the message time is invalid THEN
+				*	use the current time as the message time.
+				*/
+				if (mStartStopMessageTime == 0)
+				{
+					mStartStopMessageTime = UnixTime::Time();
+				}
+				/*
+				*	If the log is running, then stop
+				*	else the log is either not running or is stopped.
+				*	By sending a kStartLog message, the log is either started or
+				*	resumed.
+				*/
+				QueueTimePacket(logState == RemoteHikeLog::eRunning ? Log::kStopLog : Log::kStartLog,
+									mStartStopMessageTime);
 			}
 			break;
 		}
@@ -450,6 +476,9 @@ void RemoteLogAction::QueueLocnIndexPacket(
 }
 
 /****************************** QueueTimePacket *******************************/
+/*
+*	Called to either start or stop the log.
+*/
 void RemoteLogAction::QueueTimePacket(
 	uint32_t	inMessage,
 	time32_t	inTime)
