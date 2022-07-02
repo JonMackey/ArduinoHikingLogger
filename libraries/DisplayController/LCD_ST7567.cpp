@@ -258,7 +258,7 @@ void LCD_ST7567::WriteWakeUpCmds(void)
 
 /********************************* FillPixels *********************************/
 void LCD_ST7567::FillPixels(
-	uint16_t	inPixelsToFill,
+	uint32_t	inPixelsToFill,
 	uint16_t	inFillColor)
 {
 	mDataRow = mRow;

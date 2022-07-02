@@ -61,7 +61,7 @@ public:
 	*	current position and column clipping.
 	*/
 	virtual void			FillPixels(
-								uint16_t				inPixelsToFill,
+								uint32_t				inPixelsToFill,
 								uint16_t				inFillColor);
 								
 	/*
