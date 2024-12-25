@@ -22,8 +22,12 @@
 #ifndef MSPeriod_h
 #define MSPeriod_h
 
+#ifndef __MACH__
 #include <Arduino.h>
-
+#else
+#include <sys/time.h>
+#include <inttypes.h>
+#endif
 class MSPeriod
 {
 public:
@@ -38,6 +42,14 @@ public:
 								{return(mPeriod);}
 	inline void				SetElapsed(void)
 								{mPeriod = ElapsedTime();}
+#ifdef __MACH__
+	static uint32_t			millis(void)
+							{
+								timeval	timeVal;
+								gettimeofday(&timeVal, nullptr);
+								return((uint32_t)((timeVal.tv_sec * 1000) + (timeVal.tv_usec/1000)));
+							}
+#endif
 	inline uint32_t			ElapsedTime(void) const
 								{return(millis() - mStart);}
 	inline bool				Passed(void) const

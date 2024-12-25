@@ -22,7 +22,7 @@
 #include "UnixTimeEditor.h"
 #include "DisplayController.h"
 #include "XFont.h"
-#include <avr/pgmspace.h>
+//#include <avr/pgmspace.h>
 
 const char kSetStr[] PROGMEM = "SET";
 const char kCancelStr[] PROGMEM = "CANCEL";

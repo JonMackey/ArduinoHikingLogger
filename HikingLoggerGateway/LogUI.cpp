@@ -1110,6 +1110,11 @@ void LogUI::SyncWithBMP280Remote(void)
 		*/
 		LogTempPres::GetInstance().MakeInvalid();
 		mSyncState = eBMP280SyncError;
+		/*
+		*	Most of the time the reason for the sync error is the BMP280 is out
+		*	of range of the gateway.  Play a sound to notify of the sync error.
+		*/
+		mMP3Player.Play(2);	// Play sound at index 2
 	}
 }
 

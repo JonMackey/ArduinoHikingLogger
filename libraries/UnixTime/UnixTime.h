@@ -69,6 +69,9 @@ public:
 	static void				CreateDayOfWeekStr(
 								time32_t				inTime,
 								char*					outDayStr);
+	static void				CreateMonthStr(
+								uint8_t					inMonth,
+								char*					outMonthStr);
 	static uint8_t			DaysInMonthForYear(
 								uint8_t					inMonth,
 								uint16_t				inYear);
@@ -132,9 +135,21 @@ public:
 	static void				SDFatDateTimeCB(
 								uint16_t*				outDate,
 								uint16_t*				outTime);
-#ifndef __MACH__
 	static void				SetTimeFromExternalRTC(void);
-#endif
+	struct SComponents
+	{
+		uint8_t		second;
+		uint8_t		minute;
+		uint8_t		hour;
+		uint8_t		day;
+		uint8_t		month;
+		uint16_t	year;
+	};
+	static void				ToComponents(
+								time32_t				inTime,
+								SComponents&			outComponents);
+	static time32_t			FromComponents(
+								const SComponents&		inComponents);
 protected:
 #ifndef __MACH__
 	static DS3231SN*		sExternalRTC;	// This is set via a subclass of UnixTime

@@ -23,11 +23,12 @@
 #include "UnixTime.h"
 #ifndef __MACH__
 #include <Arduino.h>
-#include <avr/pgmspace.h>
+//#include <avr/pgmspace.h>
 #include "SerialUtils.h"
 #include "DS3231SN.h"
 #else
 #include <iostream>
+#include <CoreFoundation/CFTimeZone.h>
 #define PROGMEM
 #define pgm_read_word(xx) *(xx)
 #define pgm_read_byte(xx) *(xx)
@@ -112,6 +113,46 @@ void UnixTime::UnixTimeToDSDateTime(
 	outDSDateTime.dt.year = year - 2000;
 }
 
+/********************************** SetTime ***********************************/
+void UnixTime::SetTime(
+	time32_t	inTime)
+{
+	#if defined ESP_H
+		sTime = inTime;
+	#elif  defined _STM32_DEF_
+		sTime = inTime;
+	#else
+		cli();
+		sTime = inTime;
+		sei();
+	#endif
+	if (sExternalRTC)
+	{
+		DSDateTime	dateAndTime;
+		UnixTimeToDSDateTime(inTime, dateAndTime);
+		sExternalRTC->SetTime(dateAndTime);
+	}
+}
+#endif
+
+#ifdef __MACH__
+/*************************** SetTimeFromExternalRTC ***************************/
+void UnixTime::SetTimeFromExternalRTC(void)
+{
+	CFTimeZoneRef tz = CFTimeZoneCopySystem();
+	time32_t localTime = (time32_t)(time(nullptr) + CFTimeZoneGetSecondsFromGMT(tz, 0));
+	CFRelease(tz);
+#if defined ESP_H
+	sTime = localTime;
+#elif  defined _STM32_DEF_
+	sTime = localTime;
+#else
+	cli();
+	sTime = localTime;
+	sei();
+#endif
+}
+#else
 /*************************** SetTimeFromExternalRTC ***************************/
 void UnixTime::SetTimeFromExternalRTC(void)
 {
@@ -122,24 +163,15 @@ void UnixTime::SetTimeFromExternalRTC(void)
 
 		time32_t time = DSDateTimeToUnixTime(dateAndTime);
 		
+	#if defined ESP_H
+		sTime = time;
+	#elif  defined _STM32_DEF_
+		sTime = time;
+	#else
 		cli();
 		sTime = time;
 		sei();
-	}
-}
-
-/********************************** SetTime ***********************************/
-void UnixTime::SetTime(
-	time32_t	inTime)
-{
-	cli();
-	sTime = inTime;
-	sei();
-	if (sExternalRTC)
-	{
-		DSDateTime	dateAndTime;
-		UnixTimeToDSDateTime(inTime, dateAndTime);
-		sExternalRTC->SetTime(dateAndTime);
+	#endif
 	}
 }
 #endif
@@ -319,6 +351,50 @@ uint8_t UnixTime::StrDecValue(
 	return((value*10) + in2ByteStr[1] - '0');
 }
 
+/******************************** ToComponents ********************************/
+void UnixTime::ToComponents(
+	time32_t		inTime,
+	SComponents&	outComponents)
+{
+	TimeComponents(DateComponents(inTime,
+									outComponents.year,
+									outComponents.month,
+									outComponents.day),
+									outComponents.hour,
+									outComponents.minute,
+									outComponents.second);
+}
+
+/******************************* FromComponents *******************************/
+time32_t UnixTime::FromComponents(
+	const SComponents&	inComponents)
+{
+	time32_t time = kYear2000;
+	uint16_t	year = inComponents.year % 2000;
+	time += (year * 31536000);
+	{
+		uint16_t	days = pgm_read_word(&kDaysTo[inComponents.month-1])
+								+ inComponents.day;
+		/*
+		*	If past February AND
+		*	year is a leap year THEN
+		*	add a day
+		*/
+		if (inComponents.month > 2 &&
+			(year % 4) == 0)
+		{
+			days++;
+		}
+		// Account for leap year days since 2000
+		days += (((year+3)/4)-1);
+		time += (days * kOneDay);
+	}
+	time += (((uint32_t)inComponents.hour) * kOneHour);
+	time += (inComponents.minute * kOneMinute);
+	time += inComponents.second;
+	return(time);
+}
+
 /******************************* TimeComponents *******************************/
 void UnixTime::TimeComponents(
 	time32_t	inTime,
@@ -379,9 +455,23 @@ void UnixTime::CreateDateStr(
 	Uint16ToDecStr(year, &outDateStr[7]);
 }
 
+/******************************* CreateMonthStr *******************************/
+/*
+*	Returns a month string as a 3 letter uppercase English abbreviation.
+*	No validity checking on inMonth is performed.  inMonth should be a number
+*	from 1 to 12.
+*/
+void UnixTime::CreateMonthStr(
+	uint8_t		inMonth,
+	char*		outMonthStr)
+{
+	memcpy_P(outMonthStr, &kMonth3LetterAbbr[(inMonth-1)*3], 3);
+	outMonthStr[3] = 0;
+}
+
 /***************************** CreateDayOfWeekStr *****************************/
 /*
-*	Creates a day of week string as a 3 letter abbreviation.
+*	Creates a day of week string as a 3 letter uppercase English abbreviation.
 */
 void UnixTime::CreateDayOfWeekStr(
 	time32_t	inTime,
