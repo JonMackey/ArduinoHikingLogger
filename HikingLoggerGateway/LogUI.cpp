@@ -120,7 +120,7 @@ bool	LogUI::sSDInsertedOrRemoved;
 LogUI::LogUI(void)
 : mSDCardPresent(false), mRadio(Config::kRadioNSSPin, Config::kRadioIRQPin),
 	mMP3Player(Serial1, Config::kMP3RxPin, Config::kMP3TxPin, Config::kMP3PowerPin),
-	mDebouncePeriod(DEBOUNCE_DELAY)
+	mDebouncePeriod(DEBOUNCE_DELAY), mWasSyncd(false)
 {
 	pinMode(Config::kSDDetectPin, INPUT_PULLUP);
 	pinMode(Config::kSDSelectPin, OUTPUT);
@@ -668,6 +668,9 @@ void LogUI::Update(void)
 							case Config::kRightBtn:	// Right button pressed
 								LeftRightButtonPressed(true);
 								break;
+							case Config::kLeftBtn + Config::kRightBtn: // Left & Right pressed
+								GoToSleep();
+								break;
 							default:
 								mDebouncePeriod.Start();
 								break;
@@ -690,13 +693,12 @@ void LogUI::Update(void)
 	*/
 	} else if (sButtonPressed)
 	{
+		uint8_t		pinsState = ((~PIND) & Config::kPINDBtnMask) + (((~PINC) & Config::kPINCBtnMask) >> 1);
 		/*
-		*	If the left, down, and right buttons aren't pressed AND
-		*	the up and enter buttons are THEN
+		*	If the left and right buttons are pressed THEN
 		*	this is the valid button combination to wakup the board.
 		*/
-		if ((PINC & Config::kPINCBtnMask) == Config::kPINCBtnMask &&
-			(PIND & Config::kPINDBtnMask) == _BV(PIND7))
+		if (pinsState == (Config::kLeftBtn + Config::kRightBtn))
 		{
 			if (UnixTime::TimeToSleep())
 			{
@@ -1089,6 +1091,7 @@ void LogUI::SyncWithBMP280Remote(void)
 						mBMP280Period.Start(-Log::kBMP280AcquisitionTime);
 						LogTempPres::GetInstance().Set(packet->temp, packet->pres);
 						mSyncState = eBMP280SyncSuccess;
+						mWasSyncd = true;
 						if (!mHikeLog->Active())
 						{
 							mHikeLog->UpdateStartingAltitude();
@@ -1113,8 +1116,14 @@ void LogUI::SyncWithBMP280Remote(void)
 		/*
 		*	Most of the time the reason for the sync error is the BMP280 is out
 		*	of range of the gateway.  Play a sound to notify of the sync error.
+		*
+		*	Only play warning if it was syncd and is no longer syncd
 		*/
-		mMP3Player.Play(2);	// Play sound at index 2
+		if (mWasSyncd)
+		{
+			mWasSyncd = false;	// Only play warning once
+			mMP3Player.Play(2);	// Play sound at index 2
+		}
 	}
 }
 

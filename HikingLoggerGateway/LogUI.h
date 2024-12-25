@@ -165,6 +165,7 @@ protected:
 	uint8_t		mStartPinState;
 	bool		mSDCardPresent;
 	bool		mSleeping;
+	bool		mWasSyncd;
 
 	uint8_t		mPrevLogState;
 	uint8_t		mPrevMode;
